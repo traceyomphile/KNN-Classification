@@ -1,7 +1,7 @@
 import torch as t
 from sklearn.datasets import load_iris
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
 import matplotlib.pyplot as plt
@@ -53,6 +53,40 @@ def iris_model(X_train, y_train, k: int = 5):
 
     return trained_model
 
+def find_optimal_k(X_train, y_train, max_k: int = 50):
+    max_valid_k = min(max_k, len(X_train) - 1)
+
+    # Test odd K values to reduce the chance of tied votes
+    k_values = list(range(1, max_valid_k+1, 2))
+
+    parameter_grid = {
+        "n_neighbors": k_values
+    }
+
+    cross_validation = StratifiedKFold(
+        n_splits=5,
+        shuffle=True,
+        random_state=42
+    )
+
+    search = GridSearchCV(
+        estimator=KNeighborsClassifier(),
+        param_grid=parameter_grid,
+        scoring="accuracy",
+        cv=cross_validation,
+        n_jobs=-1
+    )
+
+    search.fit(X_train, y_train)
+
+    best_k = search.best_params_["n_neighbors"]
+    best_model = search.best_estimator_
+
+    print(f"\nOptimal K: {best_k}")
+    print(f"Cross-validation accuracy: {search.best_score_:.4f}")
+
+    return best_k, best_model, search.cv_results_
+
 def plot_results(y_true, y_pred, class_names):
     cm = confusion_matrix(y_true, y_pred)
 
@@ -79,6 +113,7 @@ def main():
     print(f"Test data size: {X_test.shape[0]}")
 
     # Train model for Iris Dataset
+    print("\nBaseline model with K = 5")
     model = iris_model(X_train, y_train)
     y_pred = model.predict(X_test)
 
@@ -88,5 +123,20 @@ def main():
     # Plot Iris Results
     plot_results(y_test, y_pred, classes)
 
+    # Tune K
+    print("\nTuned K Results")
+
+    print("\nOptimal K Model Results")
+    _, model, results = find_optimal_k(X_train, y_train, max_k=50)
+
+    print(f"\nTuning results:\n{results}")
+    y_pred = model.predict(X_test)
+
+    report = classification_report(y_test, y_pred, target_names=classes)
+
+    print("\nOptimal K Classification Report")
+    print(report)
+
+    plot_results(y_test, y_pred, classes)
 if __name__ == '__main__':
     main()
