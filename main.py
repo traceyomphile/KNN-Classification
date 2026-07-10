@@ -1,17 +1,38 @@
 import numpy as np
-from sklearn.datasets import load_iris
+from sklearn.datasets import (
+    load_iris,
+    load_digits,
+    load_wine,
+    load_breast_cancer
+)
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
+from sklearn.model_selection import (
+    train_test_split, 
+    GridSearchCV, 
+    StratifiedKFold
+)
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
+from sklearn.metrics import (
+    confusion_matrix, 
+    ConfusionMatrixDisplay, 
+    classification_report,
+    accuracy_score
+)
 import matplotlib.pyplot as plt
 
-def get_iris_data():
-    # Download and load the Iris data
-    iris = load_iris()
+STANDARD_DATASETS = {
+    "iris": load_iris(),
+    "digits": load_digits(),
+    "wine": load_wine(),
+    "breast_cancer": load_breast_cancer()
+}
+
+def get_data(dataset: str = "iris"):
+    # Download and load the data
+    dataset = STANDARD_DATASETS[dataset]
 
     # Get features and labels
-    X, y, class_names = iris.data, iris.target, iris.target_names
+    X, y, class_names = dataset.data, dataset.target, dataset.target_names
 
     return X, y, class_names
 
@@ -107,8 +128,11 @@ def plot_results(y_true, y_pred, class_names):
     plt.show()
 
 def main():
-    # Get Iris data and its class names
-    X, y, classes = get_iris_data()
+    # Prompt the user for dataset name
+    dataset = input("Enter standard dataset name:\n")
+
+    # Get user data and its class names
+    X, y, classes = get_data(dataset)
 
     print(f"Total dataset samples: {X.shape[0]}")
     print(f"Number of featuress: {X.shape[1]}")
@@ -127,15 +151,16 @@ def main():
     model = iris_model(X_train, y_train)
     y_pred = model.predict(X_test)
 
-    report = classification_report(y_test, y_pred, target_names=classes)
-    print(report)
+    baseline_accuracy = accuracy_score(y_test, y_pred)
+    print(f"Baseline Accuracy Score: {baseline_accuracy}")
 
-    # Plot Iris Results
-    plot_results(y_test, y_pred, classes)
+    # report = classification_report(y_test, y_pred, target_names=classes)
+    # print(report)
+
+    # Plot Results
+    #plot_results(y_test, y_pred, classes)
 
     # Tune K
-    print("\nTuned K Results")
-
     print("\nOptimal K Model Results")
     _, model, results = find_optimal_k(X_train, y_train, max_k=50)
 
@@ -143,6 +168,7 @@ def main():
     plot_k_results(results)
 
     y_pred = model.predict(X_test)
+    print(f"\nOptimal K Accuracy: {accuracy_score(y_test, y_pred)}")
     report = classification_report(y_test, y_pred, target_names=classes)
 
     print("\nOptimal K Classification Report")
