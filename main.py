@@ -19,6 +19,12 @@ def get_iris_data():
 
     return X, y, class_names
 
+def print_class_distribution(y, class_names):
+    counts = t.bincount(y)
+
+    print(f"\nSamples per class before splitting:")
+    for class_index, count in enumerate(counts):
+        print(f"{class_names[class_index]}: {count.item()} samples")
 
 def scale_data(X, y, train_ratio: float = 0.8):
     # Split the data
@@ -27,7 +33,8 @@ def scale_data(X, y, train_ratio: float = 0.8):
         y, 
         train_size=train_ratio,
         random_state=42,
-        shuffle=True
+        shuffle=True,
+        stratify=y
     )
 
     # Initialise the scaler
@@ -59,13 +66,17 @@ def main():
     # Get Iris data and its class names
     X, y, classes = get_iris_data()
 
-    print(f"Total dataset size: {X.size}")
+    print(f"Total dataset samples: {X.shape[0]}")
+    print(f"Number of featuress: {X.shape[1]}")
+
+    # Display class distribution before splitting
+    print_class_distribution(y, classes)
 
     # Get scaled and split data
     X_train, y_train, X_test, y_test = scale_data(X, y)
 
-    print(f"Training data size: {X_train.size}")
-    print(f"Test data size: {X_test.size}")
+    print(f"\nTraining data size: {X_train.shape[0]}")
+    print(f"Test data size: {X_test.shape[0]}")
 
     # Train model for Iris Dataset
     model = iris_model(X_train, y_train)
@@ -77,4 +88,5 @@ def main():
     # Plot Iris Results
     plot_results(y_test, y_pred, classes)
 
-main()
+if __name__ == '__main__':
+    main()
