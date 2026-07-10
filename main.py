@@ -3,7 +3,7 @@ from sklearn.datasets import load_iris
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
 import matplotlib.pyplot as plt
 
 def get_iris_data():
@@ -59,15 +59,22 @@ def main():
     # Get Iris data and its class names
     X, y, classes = get_iris_data()
 
+    print(f"Total dataset size: {X.size}")
+
     # Get scaled and split data
     X_train, y_train, X_test, y_test = scale_data(X, y)
+
+    print(f"Training data size: {X_train.size}")
+    print(f"Test data size: {X_test.size}")
 
     # Train model for Iris Dataset
     model = iris_model(X_train, y_train)
     y_pred = model.predict(X_test)
 
-    # PLot Iris Results
+    report = classification_report(y_test, y_pred, target_names=classes)
+    print(report)
+
+    # Plot Iris Results
     plot_results(y_test, y_pred, classes)
 
-if __name__ == '__main__':
-    main()
+main()
