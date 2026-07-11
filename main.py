@@ -5,12 +5,14 @@ from sklearn.datasets import (
     load_wine,
     load_breast_cancer
 )
+
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import (
-    train_test_split, 
-    GridSearchCV, 
-    StratifiedKFold
+    train_test_split,
+    StratifiedKFold,
+    cross_val_score
 )
+
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import (
     confusion_matrix, 
@@ -18,6 +20,7 @@ from sklearn.metrics import (
     classification_report,
     accuracy_score
 )
+
 import matplotlib.pyplot as plt
 
 STANDARD_DATASETS = {
@@ -28,11 +31,19 @@ STANDARD_DATASETS = {
 }
 
 def get_data(dataset: str = "iris"):
+    if dataset not in STANDARD_DATASETS:
+        valid_names = ", ".join(STANDARD_DATASETS)
+
+        raise ValueError(
+            f"Unknown dataset '{dataset}'. "
+            f"Choose from: {valid_names}"
+        )
+    
     # Download and load the data
-    dataset = STANDARD_DATASETS[dataset]
+    selected_dataset = STANDARD_DATASETS[dataset]
 
     # Get features and labels
-    X, y, class_names = dataset.data, dataset.target, dataset.target_names
+    X, y, class_names = selected_dataset.data, selected_dataset.target, selected_dataset.target_names.astype(str)
 
     return X, y, class_names
 
@@ -63,22 +74,19 @@ def scale_data(X, y, train_ratio: float = 0.8):
 
     return scaled_train, y_train, scaled_test, y_test
 
-def iris_model(X_train, y_train, k: int = 5):
+def data_model(X_train, y_train, k: int = 5):
     model = KNeighborsClassifier(n_neighbors=k)
 
     trained_model = model.fit(X_train, y_train)
 
     return trained_model
 
-def find_optimal_k(X_train, y_train, max_k: int = 50):
-    max_valid_k = min(max_k, len(X_train) - 1)
-
-    # Test odd K values to reduce the chance of tied votes
+def evaluate_k_values(X_train, y_train, X_test, y_test, max_k: int = 50):
+    max_valid_k = min(max_k, len(X_train)-1)
     k_values = list(range(1, max_valid_k+1, 2))
 
-    parameter_grid = {
-        "n_neighbors": k_values
-    }
+    mean_cv_accs = []
+    test_accs = []
 
     cross_validation = StratifiedKFold(
         n_splits=5,
@@ -86,36 +94,46 @@ def find_optimal_k(X_train, y_train, max_k: int = 50):
         random_state=42
     )
 
-    search = GridSearchCV(
-        estimator=KNeighborsClassifier(),
-        param_grid=parameter_grid,
-        scoring="accuracy",
-        cv=cross_validation,
-        n_jobs=1
-    )
+    for k in k_values:
+        model = KNeighborsClassifier(n_neighbors=k)
 
-    search.fit(X_train, y_train)
+        # Calculate the accuracy for each cross-validation fold
+        cv_scores = cross_val_score(
+            model,
+            X_train,
+            y_train,
+            scoring="accuracy",
+            cv=cross_validation,
+            n_jobs=1
+        )
 
-    best_k = search.best_params_["n_neighbors"]
-    best_model = search.best_estimator_
+        # Store the average accuracy across the folds
+        mean_cv_accs.append(round(cv_scores.mean(), 4))
 
-    print(f"\nOptimal K: {best_k}")
-    print(f"Cross-validation accuracy: {search.best_score_:.4f}")
+        # Train using the full training set
+        model.fit(X_train, y_train)
 
-    return best_k, best_model, search.cv_results_
+        # Evaluate using the test set
+        y_pred = model.predict(X_test)
+        test_accs.append(round(accuracy_score(y_test, y_pred), 4))
 
-def plot_k_results(results):
-    k_values = results["param_n_neighbors"].data.astype(int)
-    mean_scores = results["mean_test_score"]
+    return k_values, mean_cv_accs, test_accs
 
+def plot_k_results(k_values, mean_cv_accs, test_accs):
     plt.figure(figsize=(12, 6))
-    plt.plot(k_values, mean_scores, marker="o")
+
+    plt.plot(k_values, mean_cv_accs, marker="o", label="Mean Cross-Validation Accuracy")
+    plt.plot(k_values, test_accs, marker='s', label="Test Accuracy")
 
     plt.xlabel("Number of Neighbours, K")
-    plt.ylabel("Mean Cross-Validation Accuracy")
-    plt.title("KNN Accuracy for Different K Values")
+    plt.ylabel("Accuracy")
+    plt.title("Cross-Validation Accuracy vs Test Accuracy")
     plt.xticks(k_values)
+    #plt.ylim(0, 1.05)
     plt.grid(True)
+    plt.legend()
+
+    plt.tight_layout()
     plt.show()
 
 def plot_results(y_true, y_pred, class_names):
@@ -131,49 +149,50 @@ def main():
     # Prompt the user for dataset name
     dataset = input("Enter standard dataset name:\n")
 
-    # Get user data and its class names
-    X, y, classes = get_data(dataset)
+    try:
+        # Get user data and its class names
+        X, y, classes = get_data(dataset)
 
-    print(f"Total dataset samples: {X.shape[0]}")
-    print(f"Number of featuress: {X.shape[1]}")
+        print(f"Total dataset samples: {X.shape[0]}")
+        print(f"Number of featuress: {X.shape[1]}")
 
-    # Display class distribution before splitting
-    print_class_distribution(y, classes)
+        # Display class distribution before splitting
+        print_class_distribution(y, classes)
 
-    # Get scaled and split data
-    X_train, y_train, X_test, y_test = scale_data(X, y)
+        # Get scaled and split data
+        X_train, y_train, X_test, y_test = scale_data(X, y)
 
-    print(f"\nTraining data size: {X_train.shape[0]}")
-    print(f"Test data size: {X_test.shape[0]}")
+        print(f"\nTraining samples: {X_train.shape[0]}")
+        print(f"Test samples: {X_test.shape[0]}")
 
-    # Train model for Iris Dataset
-    print("\nBaseline model with K = 5")
-    model = iris_model(X_train, y_train)
-    y_pred = model.predict(X_test)
+        k_values, cv_accs, test_accs = evaluate_k_values(
+            X_train,
+            y_train,
+            X_test,
+            y_test
+        )
 
-    baseline_accuracy = accuracy_score(y_test, y_pred)
-    print(f"Baseline Accuracy Score: {baseline_accuracy}")
+        plot_k_results(k_values, cv_accs, test_accs)
 
-    # report = classification_report(y_test, y_pred, target_names=classes)
-    # print(report)
+        # Select K using cross-validation
+        best_cv_index = np.argmax(cv_accs)
+        opt_k = k_values[best_cv_index]
 
-    # Plot Results
-    #plot_results(y_test, y_pred, classes)
+        print(f"\nOptimal K: {opt_k}")
+        print(f"Mean Cross-Validation Accuracy at Optimal K: {cv_accs[best_cv_index]}")
+        print(f"Test Accuracy at Optimal K: {test_accs[best_cv_index]}")
 
-    # Tune K
-    print("\nOptimal K Model Results")
-    _, model, results = find_optimal_k(X_train, y_train, max_k=50)
+        # Final model on Optimal K
+        model = data_model(X_train, y_train, k=opt_k)
+        y_pred = model.predict(X_test)
 
-    print(f"\nTuning results:")
-    plot_k_results(results)
+        print("\nOptimal K Classification Report")
+        print(classification_report(y_test, y_pred, target_names=classes))
 
-    y_pred = model.predict(X_test)
-    print(f"\nOptimal K Accuracy: {accuracy_score(y_test, y_pred)}")
-    report = classification_report(y_test, y_pred, target_names=classes)
+        plot_results(y_test, y_pred, classes)
+    
+    except Exception as er:
+        print(f"Error: {er}")
 
-    print("\nOptimal K Classification Report")
-    print(report)
-
-    plot_results(y_test, y_pred, classes)
 if __name__ == '__main__':
     main()
