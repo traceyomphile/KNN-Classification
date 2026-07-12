@@ -1,5 +1,6 @@
 from math import ceil
 from typing import Literal
+import traceback
 
 import numpy as np
 from fastapi import FastAPI, HTTPException
@@ -30,10 +31,10 @@ from sklearn.metrics import (
 DatasetName = Literal['iris', 'digits', 'wine', 'breast_cancer']
 
 DATASET_LOADERS = {
-    "iris": load_iris(),
-    "digits": load_digits(),
-    "wine": load_wine(),
-    "breast_cancer": load_breast_cancer()
+    "iris": load_iris,
+    "digits": load_digits,
+    "wine": load_wine,
+    "breast_cancer": load_breast_cancer
 }
 
 class AnalysisRequest(BaseModel):
@@ -230,8 +231,8 @@ def analyse_model(request: AnalysisRequest):
         chart_points = [
             {
                 'k': int(k),
-                'cv_accuracy': float(cv_accs),
-                'test_accuracy': float(test_accs),
+                'cv_accuracy': float(cv_accuracy),
+                'test_accuracy': float(test_accuracy),
             }
             for k, cv_accuracy, test_accuracy in zip(
                 k_values,
@@ -268,8 +269,10 @@ def analyse_model(request: AnalysisRequest):
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     except Exception as error:
+        traceback.print_exc()
+
         raise HTTPException(
             status_code=500,
-            detail=f"Model analysis failed: {error}",
+            detail=f"Model analysis failed: {type(error).__name__}: {error}",
         ) from error
     
