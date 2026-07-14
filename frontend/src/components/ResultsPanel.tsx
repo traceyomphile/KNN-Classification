@@ -92,13 +92,13 @@ export default function ResultsPanel({ result, onRestart, onBack }: ResultsPanel
       <div className="flex flex-col-reverse sm:flex-row justify-center gap-3">
         <button
           onClick={onBack}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-line px-6 py-3 text-mist hover:border-cyan hover:text-cyan transition-colors font-display"
+          className="mr-auto inline-flex items-center justify-center gap-2 rounded-xl border border-line px-6 py-3 text-mist hover:border-cyan hover:text-cyan transition-colors font-display"
         >
           <ArrowLeft size={16} /> Back
         </button>
         <button
           onClick={onRestart}
-          className="inline-flex items-center gap-2 rounded-xl border border-line px-6 py-3 text-mist hover:border-cyan hover:text-cyan transition-colors font-display"
+          className="ml-auto inline-flex items-center gap-2 rounded-xl border border-line px-6 py-3 text-mist hover:border-cyan hover:text-cyan transition-colors font-display"
         >
           <RotateCcw size={16} /> Try another dataset
         </button>

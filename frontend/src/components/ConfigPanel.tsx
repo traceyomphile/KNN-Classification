@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Sparkles, CheckCircle2, ArrowLeft } from 'lucide-react'
+import { Sparkles, CheckCircle2, ArrowLeft, ArrowRight } from 'lucide-react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { RunConfig } from '../types'
 
@@ -75,9 +75,9 @@ export default function ConfigPanel({ datasetInfo, config, setConfig, onRun, onB
         </button>
         <button
           onClick={onRun}
-          className="flex-1 rounded-xl bg-cyan text-ink font-display text-lg font-medium py-4 hover:bg-cyan/90 transition-colors"
+          className="ml-auto inline-flex items-center justify-center gap-2 rounded-xl border border-line px-5 py-4 text-mist hover:border-cyan hover:text-cyan transition-colors font-display"
         >
-          Find optimal K &amp; fit model
+          Optimal Search <ArrowRight size={16} /> 
         </button>
       </div>
     </motion.div>

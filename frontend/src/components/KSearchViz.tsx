@@ -4,7 +4,7 @@ import {
   CartesianGrid, Tooltip, ReferenceLine, Legend,
 } from 'recharts'
 import { motion } from 'framer-motion'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
 import type { KResultPoint, OptimalModel } from '../types'
 
 interface KSearchVizProps {
@@ -18,21 +18,25 @@ export default function KSearchViz({ kResults, optimal, onContinue, onBack }: KS
   const [visibleCount, setVisibleCount] = useState(0)
   useEffect(() => {
     if (!kResults?.length) return
-    // reset visible count on next tick to avoid synchronous setState within effect
-    const resetTimeout = window.setTimeout(() => setVisibleCount(0), 0)
-    const stepMs = Math.max(18, Math.min(70, 1400 / kResults.length))
-    const id = setInterval(() => {
-      setVisibleCount((c) => {
-        if (c >= kResults.length) {
-          clearInterval(id)
-          return c
-        }
-        return c + 1
-      })
-    }, stepMs)
+
+    let id: number | undefined
+    const resetId = window.setTimeout(() => {
+      setVisibleCount(0)
+      const stepMs = Math.max(18, Math.min(70, 1400 / kResults.length))
+      id = window.setInterval(() => {
+        setVisibleCount((c) => {
+          if (c >= kResults.length) {
+            if (id !== undefined) window.clearInterval(id)
+            return c
+          }
+          return c + 1
+        })
+      }, stepMs)
+    }, 0)
+
     return () => {
-      clearInterval(id)
-      clearTimeout(resetTimeout)
+      if (id !== undefined) window.clearInterval(id)
+      window.clearTimeout(resetId)
     }
   }, [kResults])
 
@@ -88,9 +92,9 @@ export default function KSearchViz({ kResults, optimal, onContinue, onBack }: KS
         <button
           onClick={onContinue}
           disabled={sweeping}
-          className="rounded-xl bg-cyan text-ink font-display px-8 py-3 hover:bg-cyan/90 transition-colors disabled:opacity-40 disabled:cursor-wait"
+          className="ml-auto inline-flex items-center justify-center gap-2 rounded-xl border border-line px-5 py-4 text-mist hover:border-cyan hover:text-cyan transition-colors font-display disabled:opacity-40 disabled:cursor-wait"
         >
-          {sweeping ? 'Sweeping…' : 'Continue to fit & predict →'}
+          {sweeping ? 'Sweeping…' : 'Run Model'} <ArrowRight size={16} />
         </button>
       </div>
     </div>

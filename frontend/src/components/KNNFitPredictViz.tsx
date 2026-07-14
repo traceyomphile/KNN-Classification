@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Info, ArrowLeft } from 'lucide-react'
+import { Info, ArrowLeft, ArrowRight } from 'lucide-react'
 import type { DatasetSummary, OptimalModel } from '../types'
 
 const PALETTE = ['#5EEAD4', '#FF6B4A', '#F2C078', '#9B8CFF', '#7ED957', '#4AB8FF']
@@ -44,10 +44,7 @@ function seeded(i: number): number {
 }
 
 export default function KnnFitPredictViz({ datasetInfo, optimal, testAccuracy, onContinue, onBack }: KnnFitPredictVizProps) {
-  const classes = useMemo(
-    () => (datasetInfo.classes?.length ? datasetInfo.classes : ['A', 'B', 'C']),
-    [datasetInfo.classes],
-  )
+  const classes = useMemo(() => datasetInfo.classes?.length ? datasetInfo.classes : ['A', 'B', 'C'], [datasetInfo.classes])
   const k = optimal.k || 5
   const shownK = Math.min(k, 9)
 
@@ -209,9 +206,9 @@ export default function KnnFitPredictViz({ datasetInfo, optimal, testAccuracy, o
         <button
           onClick={onContinue}
           disabled={!allDone}
-          className="rounded-xl bg-cyan text-ink font-display px-8 py-3 hover:bg-cyan/90 transition-colors disabled:opacity-40 disabled:cursor-wait"
+          className="ml-auto inline-flex items-center justify-center gap-2 rounded-xl border border-line px-5 py-4 text-mist hover:border-cyan hover:text-cyan transition-colors font-display disabled:opacity-40 disabled:cursor-wait"
         >
-          {allDone ? 'View full results →' : 'Predicting…'}
+          {allDone ? 'View full results' : 'Predicting…'} <ArrowRight size={16} />
         </button>
       </div>
     </div>
