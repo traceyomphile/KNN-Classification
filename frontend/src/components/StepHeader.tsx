@@ -2,10 +2,6 @@ import { Radar } from 'lucide-react'
 import type { Stage } from '../types'
 
 const STEPS: Stage[] = ['select', 'loading', 'configure', 'search', 'fit', 'results']
-const STEP_LABELS: Record<Stage, string> = {
-  select: 'Dataset', loading: 'Load', configure: 'Params',
-  split: 'Split', search: 'Search K', fit: 'Fit & predict', results: 'Results',
-}
 
 interface StepHeaderProps {
   stage: Stage
@@ -32,7 +28,6 @@ export default function StepHeader({ stage }: StepHeaderProps) {
             </div>
           ))}
         </div>
-        <span className="font-mono text-xs text-fog uppercase tracking-widest">{STEP_LABELS[stage]}</span>
       </div>
     </header>
   )

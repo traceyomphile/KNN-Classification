@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis,
   CartesianGrid, Tooltip, ReferenceLine, Legend,
@@ -43,6 +43,27 @@ export default function KSearchViz({ kResults, optimal, onContinue, onBack }: KS
   const visible = kResults?.slice(0, visibleCount) || []
   const sweeping = visibleCount < (kResults?.length || 0)
 
+  const yDomain = useMemo<[number, number]>(() => {
+    const accuracyValues = (kResults || [])
+      .flatMap((point) => [point.cv_accuracy, point.test_accuracy])
+      .filter((value) => Number.isFinite(value))
+
+    if (!accuracyValues.length) return [0, 1]
+
+    const minimum = Math.min(...accuracyValues)
+    const maximum = Math.max(...accuracyValues)
+    let lowerBound = Math.max(0, Math.floor(minimum * 10) / 10)
+    let upperBound = Math.min(1, Math.ceil(maximum * 10) / 10)
+
+    // Keep at least a 0.1 range when every value rounds to the same boundary.
+    if (lowerBound === upperBound) {
+      if (upperBound < 1) upperBound = Math.min(1, upperBound + 0.1)
+      else lowerBound = Math.max(0, lowerBound - 0.1)
+    }
+
+    return [lowerBound, upperBound]
+  }, [kResults])
+
   return (
     <div className="w-full max-w-3xl mx-auto">
       <p className="font-mono text-xs uppercase tracking-[0.25em] text-fog mb-2 text-center">
@@ -54,19 +75,19 @@ export default function KSearchViz({ kResults, optimal, onContinue, onBack }: KS
 
       <div className="h-72 rounded-xl border border-line bg-panel p-4">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={visible} margin={{ top: 8, right: 16, bottom: 0, left: -12 }}>
-            <CartesianGrid stroke="#232C36" strokeDasharray="3 3" />
+          <LineChart data={visible} margin={{ top: 15, right: 16, bottom: 0, left: -12 }}>
+            <CartesianGrid stroke="#232C36" strokeOpacity={0.22} strokeDasharray="3 3" />
             <XAxis dataKey="k" stroke="#586373" fontSize={11} tickLine={false} />
-            <YAxis stroke="#586373" fontSize={11} tickLine={false} domain={[0, 1]} />
+            <YAxis stroke="#586373" fontSize={11} tickLine={false} domain={yDomain} allowDataOverflow tickFormatter={(value: number) => value.toFixed(2)} />
             <Tooltip
               contentStyle={{ background: '#161D25', border: '1px solid #232C36', borderRadius: 8, fontSize: 12 }}
               labelStyle={{ color: '#EDF1F4' }}
             />
             <Legend wrapperStyle={{ fontSize: 12, color: '#8B96A3' }} />
-            <Line type="monotone" dataKey="cv_accuracy" name="CV accuracy" stroke="#5EEAD4" strokeWidth={2} dot={false} isAnimationActive={false} />
-            <Line type="monotone" dataKey="test_accuracy" name="Test accuracy" stroke="#FF6B4A" strokeWidth={1.5} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
+            <Line type="monotone" dataKey="cv_accuracy" name="CV accuracy" stroke="#f50ea0" strokeWidth={3} dot={false} isAnimationActive={true} />
+            <Line type="monotone" dataKey="test_accuracy" name="Test accuracy" stroke="#02fe49" strokeWidth={3} dot={false} isAnimationActive={true} />
             {!sweeping && optimal && (
-              <ReferenceLine x={optimal.k} stroke="#F2C078" strokeDasharray="2 2" label={{ value: `k=${optimal.k}`, fill: '#F2C078', fontSize: 11, position: 'top' }} />
+              <ReferenceLine x={optimal.k} stroke="#679bd6" strokeOpacity={1} strokeWidth={2} strokeDasharray="2 2" label={{ value: `k=${optimal.k}`, fill: '#679bd6', fontSize: 14, position: 'top' }} />
             )}
           </LineChart>
         </ResponsiveContainer>
@@ -82,7 +103,7 @@ export default function KSearchViz({ kResults, optimal, onContinue, onBack }: KS
         </motion.div>
       )}
 
-      <div className="flex flex-col-reverse sm:flex-row justify-center gap-3">
+      <div className="w-full flex flex-row items-center gap-3">
         <button
           onClick={onBack}
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-line px-6 py-3 text-mist hover:border-cyan hover:text-cyan transition-colors font-display"

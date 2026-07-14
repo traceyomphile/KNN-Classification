@@ -25,22 +25,22 @@ export default function ConfigPanel({ datasetInfo, config, setConfig, onRun, onB
       transition={{ duration: 0.45 }}
       className="w-full max-w-2xl mx-auto"
     >
-      <div className="flex items-center gap-2 mb-4 text-good">
-        <CheckCircle2 size={16} />
-        <span className="font-mono text-xs uppercase tracking-[0.25em] capitalize">
-          {datasetInfo.display_name} loaded — {datasetInfo.samples} samples, {datasetInfo.features} features
+      <div className="flex flex-col items-center justify-center gap-2 mb-16 text-center">
+        <CheckCircle2 size={18} />
+        <span className="font-mono text-base uppercase tracking-[0.25em] text-fog">
+          {datasetInfo.display_name} loaded — {datasetInfo.samples} samples - {datasetInfo.features} features
         </span>
       </div>
 
       <div className="flex items-center gap-2 mb-4">
-        <Sparkles size={16} className="text-cyan" />
-        <span className="font-mono text-xs uppercase tracking-[0.25em] text-fog">02 · Run parameters</span>
+        <Sparkles size={28} className="text-cyan" />
+        <span className="font-mono font-bold uppercase tracking-[0.20em] text-fog">02 · Run parameters</span>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 rounded-xl border border-line bg-panel px-6 py-5 mb-8">
         <div>
           <div className="flex items-baseline justify-between mb-2">
-            <label className="text-sm text-mist">Train / test split</label>
+            <label className="text-sm text-mist">TRAIN / TEST SPLIT</label>
             <span className="font-mono text-sm text-cyan tabular-nums">
               {Math.round(config.train_ratio * 100)} / {Math.round((1 - config.train_ratio) * 100)}
             </span>
@@ -54,7 +54,7 @@ export default function ConfigPanel({ datasetInfo, config, setConfig, onRun, onB
         </div>
         <div>
           <div className="flex items-baseline justify-between mb-2">
-            <label className="text-sm text-mist">Max K to evaluate</label>
+            <label className="text-sm text-mist">MAX K </label>
             <span className="font-mono text-sm text-cyan tabular-nums">{config.max_k}</span>
           </div>
           <input

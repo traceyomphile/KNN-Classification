@@ -46,14 +46,14 @@ export default function DatasetSelectPanel({ dataset, onSelect, connectionError 
       transition={{ duration: 0.45 }}
       className="w-full max-w-4xl mx-auto"
     >
-      <div className="flex items-center gap-2 mb-6">
-        <Database size={16} className="text-cyan" />
-        <span className="font-mono text-xs uppercase tracking-[0.25em] text-fog">01 · Select dataset</span>
+      <div className="flex flex-col items-center justify-canter gap-2 mb-6 text-center">
+        <Database size={28} className="text-cyan" />
+        <span className="font-mono text-base font-bold uppercase tracking-[0.25em] text-fog">01 · Select dataset</span>
       </div>
 
       {loadErr && (
         <div className="mb-6 flex items-start gap-3 rounded-lg border border-coral/40 bg-coral/10 px-4 py-3 text-sm text-coral">
-          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <AlertTriangle size={20} className="mt-0.5 shrink-0" />
           <div>
             <p className="font-medium">Can't reach the model server.</p>
             <p className="text-coral/80 mt-0.5">{loadErr} — start the FastAPI backend and confirm VITE_API_URL, then refresh.</p>
