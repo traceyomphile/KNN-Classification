@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Info } from 'lucide-react'
+import { Info, ArrowLeft } from 'lucide-react'
 import type { DatasetSummary, OptimalModel } from '../types'
 
 const PALETTE = ['#5EEAD4', '#FF6B4A', '#F2C078', '#9B8CFF', '#7ED957', '#4AB8FF']
@@ -35,6 +35,7 @@ interface KnnFitPredictVizProps {
   optimal: OptimalModel
   testAccuracy: number
   onContinue: () => void
+  onBack: () => void
 }
 
 function seeded(i: number): number {
@@ -42,7 +43,7 @@ function seeded(i: number): number {
   return x - Math.floor(x)
 }
 
-export default function KnnFitPredictViz({ datasetInfo, optimal, testAccuracy, onContinue }: KnnFitPredictVizProps) {
+export default function KnnFitPredictViz({ datasetInfo, optimal, testAccuracy, onContinue, onBack }: KnnFitPredictVizProps) {
   const classes = datasetInfo.classes?.length ? datasetInfo.classes : ['A', 'B', 'C']
   const k = optimal.k || 5
   const shownK = Math.min(k, 9)
@@ -195,7 +196,13 @@ export default function KnnFitPredictViz({ datasetInfo, optimal, testAccuracy, o
         <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full border-2 border-coral" /> Misclassified (demo)</div>
       </div>
 
-      <div className="text-center">
+      <div className="flex flex-col-reverse sm:flex-row justify-center gap-3">
+        <button
+          onClick={onBack}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-line px-6 py-3 text-mist hover:border-cyan hover:text-cyan transition-colors font-display"
+        >
+          <ArrowLeft size={16} /> Back
+        </button>
         <button
           onClick={onContinue}
           disabled={!allDone}

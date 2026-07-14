@@ -13,8 +13,7 @@ const DATASET_BLURB: Record<DatasetName, string> = {
 
 interface DatasetSelectPanelProps {
   dataset: DatasetName
-  setDataset: (dataset: DatasetName) => void
-  onLoad: () => void
+  onSelect: (dataset: DatasetName) => void
   connectionError?: string | null
 }
 
@@ -28,7 +27,7 @@ const PLACEHOLDER_DATASETS: Pick<DatasetSummary, 'name' | 'display_name' | 'samp
     classes: [],
   }))
 
-export default function DatasetSelectPanel({ dataset, setDataset, onLoad, connectionError }: DatasetSelectPanelProps) {
+export default function DatasetSelectPanel({ dataset, onSelect, connectionError }: DatasetSelectPanelProps) {
   const [datasets, setDatasets] = useState<DatasetSummary[] | null>(null)
   const [loadErr, setLoadErr] = useState<string | null>(null)
 
@@ -38,7 +37,6 @@ export default function DatasetSelectPanel({ dataset, setDataset, onLoad, connec
       .catch((e: Error) => setLoadErr(e.message))
   }, [])
 
-  const selected = datasets?.find((d) => d.name === dataset)
   const cards = datasets ?? PLACEHOLDER_DATASETS
 
   return (
@@ -69,8 +67,9 @@ export default function DatasetSelectPanel({ dataset, setDataset, onLoad, connec
           return (
             <button
               key={d.name}
-              onClick={() => setDataset(d.name)}
-              className={`text-left rounded-xl border px-5 py-4 transition-colors ${
+              onClick={() => onSelect(d.name)}
+              disabled={!!loadErr}
+              className={`text-left rounded-xl border px-5 py-4 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                 active ? 'border-cyan bg-cyan/[0.07]' : 'border-line bg-panel hover:border-fog'
               }`}
             >
@@ -91,13 +90,6 @@ export default function DatasetSelectPanel({ dataset, setDataset, onLoad, connec
         })}
       </div>
 
-      <button
-        onClick={onLoad}
-        disabled={!!loadErr}
-        className="w-full rounded-xl bg-cyan text-ink font-display text-lg font-medium py-4 hover:bg-cyan/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        Load {selected ? selected.display_name.replace('_', ' ') : 'dataset'}
-      </button>
       {connectionError && <p className="text-coral text-sm mt-3 text-center">{connectionError}</p>}
     </motion.div>
   )

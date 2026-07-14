@@ -1,16 +1,17 @@
 import { motion } from 'framer-motion'
-import { RotateCcw, Award } from 'lucide-react'
+import { RotateCcw, Award, ArrowLeft } from 'lucide-react'
 import ConfusionMatrix from './ConfusionMatrix'
 import type { AnalysisResponse, ClassificationReportRow } from '../types'
 
 interface ResultsPanelProps {
   result: AnalysisResponse
   onRestart: () => void
+  onBack: () => void
 }
 
 const NON_CLASS_LABELS = new Set(['accuracy', 'macro avg', 'weighted avg'])
 
-export default function ResultsPanel({ result, onRestart }: ResultsPanelProps) {
+export default function ResultsPanel({ result, onRestart, onBack }: ResultsPanelProps) {
   const { dataset, split, optimal_model, confusion_matrix, classification_report } = result
 
   // Every entry except 'accuracy' / 'macro avg' / 'weighted avg' is a per-class row object.
@@ -88,7 +89,13 @@ export default function ResultsPanel({ result, onRestart }: ResultsPanelProps) {
         </div>
       </div>
 
-      <div className="text-center">
+      <div className="flex flex-col-reverse sm:flex-row justify-center gap-3">
+        <button
+          onClick={onBack}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-line px-6 py-3 text-mist hover:border-cyan hover:text-cyan transition-colors font-display"
+        >
+          <ArrowLeft size={16} /> Back
+        </button>
         <button
           onClick={onRestart}
           className="inline-flex items-center gap-2 rounded-xl border border-line px-6 py-3 text-mist hover:border-cyan hover:text-cyan transition-colors font-display"

@@ -1,37 +1,44 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis,
   CartesianGrid, Tooltip, ReferenceLine, Legend,
 } from 'recharts'
 import { motion } from 'framer-motion'
+import { ArrowLeft } from 'lucide-react'
 import type { KResultPoint, OptimalModel } from '../types'
 
 interface KSearchVizProps {
   kResults: KResultPoint[]
   optimal: OptimalModel
   onContinue: () => void
+  onBack: () => void
 }
 
-export default function KSearchViz({ kResults, optimal, onContinue }: KSearchVizProps) {
+export default function KSearchViz({ kResults, optimal, onContinue, onBack }: KSearchVizProps) {
   const [visibleCount, setVisibleCount] = useState(0)
-  const doneRef = useRef(false)
-
   useEffect(() => {
     if (!kResults?.length) return
-    setVisibleCount(0)
-    doneRef.current = false
+
     const stepMs = Math.max(18, Math.min(70, 1400 / kResults.length))
-    const id = setInterval(() => {
-      setVisibleCount((c) => {
-        if (c >= kResults.length) {
-          clearInterval(id)
-          doneRef.current = true
-          return c
-        }
-        return c + 1
-      })
-    }, stepMs)
-    return () => clearInterval(id)
+    let intervalId: number | undefined
+
+    const timeoutId = window.setTimeout(() => {
+      setVisibleCount(0)
+      intervalId = window.setInterval(() => {
+        setVisibleCount((c) => {
+          if (c >= kResults.length) {
+            if (intervalId !== undefined) clearInterval(intervalId)
+            return c
+          }
+          return c + 1
+        })
+      }, stepMs)
+    }, 0)
+
+    return () => {
+      clearTimeout(timeoutId)
+      if (intervalId !== undefined) clearInterval(intervalId)
+    }
   }, [kResults])
 
   const visible = kResults?.slice(0, visibleCount) || []
@@ -76,7 +83,13 @@ export default function KSearchViz({ kResults, optimal, onContinue }: KSearchViz
         </motion.div>
       )}
 
-      <div className="text-center">
+      <div className="flex flex-col-reverse sm:flex-row justify-center gap-3">
+        <button
+          onClick={onBack}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-line px-6 py-3 text-mist hover:border-cyan hover:text-cyan transition-colors font-display"
+        >
+          <ArrowLeft size={16} /> Back
+        </button>
         <button
           onClick={onContinue}
           disabled={sweeping}

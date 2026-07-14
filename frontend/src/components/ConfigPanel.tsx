@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Sparkles, CheckCircle2 } from 'lucide-react'
+import { Sparkles, CheckCircle2, ArrowLeft } from 'lucide-react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { RunConfig } from '../types'
 
@@ -14,9 +14,10 @@ interface ConfigPanelProps {
   config: RunConfig
   setConfig: Dispatch<SetStateAction<RunConfig>>
   onRun: () => void
+  onBack: () => void
 }
 
-export default function ConfigPanel({ datasetInfo, config, setConfig, onRun }: ConfigPanelProps) {
+export default function ConfigPanel({ datasetInfo, config, setConfig, onRun, onBack }: ConfigPanelProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -65,12 +66,20 @@ export default function ConfigPanel({ datasetInfo, config, setConfig, onRun }: C
         </div>
       </div>
 
-      <button
-        onClick={onRun}
-        className="w-full rounded-xl bg-cyan text-ink font-display text-lg font-medium py-4 hover:bg-cyan/90 transition-colors"
-      >
-        Find optimal K &amp; fit model
-      </button>
+      <div className="flex flex-col-reverse sm:flex-row gap-3">
+        <button
+          onClick={onBack}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-line px-5 py-4 text-mist hover:border-cyan hover:text-cyan transition-colors font-display"
+        >
+          <ArrowLeft size={16} /> Back
+        </button>
+        <button
+          onClick={onRun}
+          className="flex-1 rounded-xl bg-cyan text-ink font-display text-lg font-medium py-4 hover:bg-cyan/90 transition-colors"
+        >
+          Find optimal K &amp; fit model
+        </button>
+      </div>
     </motion.div>
   )
 }
