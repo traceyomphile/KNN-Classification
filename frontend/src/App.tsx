@@ -17,7 +17,7 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true)
   const [stage, setStage] = useState<Stage>('select')
   const [dataset, setDataset] = useState<DatasetName>('iris')
-  const [config, setConfig] = useState<RunConfig>({ train_ratio: 0.8, max_k: 50 })
+  const [config, setConfig] = useState<RunConfig>({ train_ratio: 0.8, max_k: 25 })
   const [loadProgress, setLoadProgress] = useState(0)
   const [result, setResult] = useState<AnalysisResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
