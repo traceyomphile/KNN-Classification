@@ -10,58 +10,58 @@ from sklearn.datasets import (
     load_iris,
     load_digits,
     load_wine,
-    load_breast_cancer
+    load_breast_cancer,
 )
-
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import (
-    train_test_split,
-    StratifiedKFold,
-    cross_val_score
-)
-
-from sklearn.neighbors import KNeighborsClassifier
+from sklearn.decomposition import PCA
 from sklearn.metrics import (
-    confusion_matrix, 
-    ConfusionMatrixDisplay, 
+    accuracy_score,
     classification_report,
-    accuracy_score
+    confusion_matrix,
 )
+from sklearn.model_selection import (
+    StratifiedKFold,
+    train_test_split,
+)
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import StandardScaler
 
-DatasetName = Literal['iris', 'digits', 'wine', 'breast_cancer']
+
+DatasetName = Literal["iris", "digits", "wine", "breast_cancer"]
 
 DATASET_LOADERS = {
     "iris": load_iris,
     "digits": load_digits,
     "wine": load_wine,
-    "breast_cancer": load_breast_cancer
+    "breast_cancer": load_breast_cancer,
 }
 
+
 class AnalysisRequest(BaseModel):
-    dataset: DatasetName = 'iris'
+    dataset: DatasetName = "iris"
     train_ratio: float = Field(default=0.8, gt=0.5, lt=0.95)
     max_k: int = Field(default=50, ge=3, le=99)
+
 
 app = FastAPI(
     title="KNN Classification Model",
     description="Runs K-Nearest Neighbours experiments on standard scikit-learn datasets",
-    version="1.0.0"
+    version="1.1.0",
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
     ],
     allow_credentials=True,
-    allow_methods=['*'],
-    allow_headers=['*'],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
 
 def get_data(dataset_name: DatasetName):
     try:
-    # Download and load the data
         selected_dataset = DATASET_LOADERS[dataset_name]()
     except KeyError as error:
         valid_names = ", ".join(DATASET_LOADERS)
@@ -69,50 +69,70 @@ def get_data(dataset_name: DatasetName):
             f"Unknown dataset '{dataset_name}'. Choose from: {valid_names}"
         ) from error
 
-    # Get features and labels
-    X, y, class_names = selected_dataset.data, selected_dataset.target, selected_dataset.target_names.astype(str)
-
+    X = selected_dataset.data
+    y = selected_dataset.target
+    class_names = selected_dataset.target_names.astype(str)
     return X, y, class_names
 
-def get_class_distribution(y: np.ndarray, class_names: np.ndarray):
-    counts = np.bincount(y)
 
+def get_class_distribution(y: np.ndarray, class_names: np.ndarray):
+    counts = np.bincount(y, minlength=len(class_names))
     return [
         {
-            'class_index': class_index,
-            'class_name': str(class_names[class_index]),
-            'samples': int(count),
-        } for class_index, count in enumerate(counts)
+            "class_index": class_index,
+            "class_name": str(class_names[class_index]),
+            "samples": int(count),
+        }
+        for class_index, count in enumerate(counts)
     ]
 
-def scale_data(X: np.ndarray, y: np.ndarray, train_ratio: float = 0.8):
-    # Split the data
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, 
-        y, 
+
+def split_and_scale_data(
+    X: np.ndarray,
+    y: np.ndarray,
+    train_ratio: float = 0.8,
+):
+    """Split first, then fit the scaler on training data only."""
+    sample_ids = np.arange(len(X))
+
+    (
+        X_train,
+        X_test,
+        y_train,
+        y_test,
+        train_ids,
+        test_ids,
+    ) = train_test_split(
+        X,
+        y,
+        sample_ids,
         train_size=train_ratio,
         random_state=42,
         shuffle=True,
-        stratify=y
+        stratify=y,
     )
 
-    # Initialise the scaler
     scaler = StandardScaler()
-
-    # Fit and transform the training data
     scaled_train = scaler.fit_transform(X_train)
     scaled_test = scaler.transform(X_test)
 
-    return scaled_train, y_train, scaled_test, y_test
+    return scaled_train, y_train, scaled_test, y_test, train_ids, test_ids
 
-def evaluate_k_values(X_train: np.ndarray, y_train: np.ndarray, X_test: np.ndarray, y_test: np.ndarray, max_k: int = 50):
+
+def evaluate_k_values(
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    X_test: np.ndarray,
+    y_test: np.ndarray,
+    max_k: int = 50,
+):
     n_splits = 5
 
-    # K must fit inside the smallest cross-validation training fold
+    # K must fit inside the smallest cross-validation training fold.
     smallest_cv_training_size = len(X_train) - ceil(len(X_train) / n_splits)
     max_valid_k = min(max_k, smallest_cv_training_size)
 
-    k_values = list(range(1, max_valid_k+1, 2))
+    k_values = list(range(1, max_valid_k + 1, 2))
     if not k_values:
         raise ValueError("The training set is too small to evaluate K values.")
 
@@ -125,52 +145,222 @@ def evaluate_k_values(X_train: np.ndarray, y_train: np.ndarray, X_test: np.ndarr
     class_count = int(np.max(y_train)) + 1
     cv_scores_by_k = {k: [] for k in k_values}
 
-    # Find the ordered neighbours once per fold.
-    for fold_train_indices, val_indices in cross_validation.split(X_train, y_train):
+    # Find ordered neighbours once per fold, then reuse them for every K.
+    for fold_train_indices, validation_indices in cross_validation.split(X_train, y_train):
         fold_X_train = X_train[fold_train_indices]
         fold_y_train = y_train[fold_train_indices]
-        fold_X_val = X_train[val_indices]
-        fold_y_val = y_train[val_indices]
+        fold_X_validation = X_train[validation_indices]
+        fold_y_validation = y_train[validation_indices]
 
-        # Fit one KNN model for each fold
         neighbour_model = KNeighborsClassifier(n_neighbors=max_valid_k)
         neighbour_model.fit(fold_X_train, fold_y_train)
 
-        # Finds the max_valid_k nearest neighbours for each validation point
-        neighbour_indices = neighbour_model.kneighbors(fold_X_val, return_distance=False)
+        neighbour_indices = neighbour_model.kneighbors(
+            fold_X_validation,
+            return_distance=False,
+        )
         neighbour_labels = fold_y_train[neighbour_indices]
-
         one_hot_labels = np.eye(class_count, dtype=np.int16)[neighbour_labels]
         cumulative_votes = np.cumsum(one_hot_labels, axis=1)
 
         for k in k_values:
-            predictions = np.argmax(cumulative_votes[:, k-1, :], axis=1)
-            cv_scores_by_k[k].append(accuracy_score(fold_y_val, predictions))
+            predictions = np.argmax(cumulative_votes[:, k - 1, :], axis=1)
+            cv_scores_by_k[k].append(
+                accuracy_score(fold_y_validation, predictions)
+            )
 
     mean_cv_accuracies = [
         round(float(np.mean(cv_scores_by_k[k])), 4)
         for k in k_values
     ]
 
-    # Repeat the reusable-neighbour calculation once for the held-out-test
     test_neighbour_model = KNeighborsClassifier(n_neighbors=max_valid_k)
     test_neighbour_model.fit(X_train, y_train)
 
-    test_neighbour_indices = test_neighbour_model.kneighbors(X_test, return_distance=False)
+    test_neighbour_indices = test_neighbour_model.kneighbors(
+        X_test,
+        return_distance=False,
+    )
     test_neighbour_labels = y_train[test_neighbour_indices]
     test_one_hot_labels = np.eye(class_count, dtype=np.int16)[test_neighbour_labels]
     test_cumulative_votes = np.cumsum(test_one_hot_labels, axis=1)
 
-    test_accs = []
+    test_accuracies = []
     for k in k_values:
-        predictions = np.argmax(test_cumulative_votes[:, k-1, :], axis=1)
-        test_accs.append(round(float(accuracy_score(y_test, predictions)), 4))
+        predictions = np.argmax(test_cumulative_votes[:, k - 1, :], axis=1)
+        test_accuracies.append(
+            round(float(accuracy_score(y_test, predictions)), 4)
+        )
 
-    return k_values, mean_cv_accuracies, test_accs
+    return k_values, mean_cv_accuracies, test_accuracies
+
+
+def project_to_two_dimensions(
+    X_train: np.ndarray,
+    X_test: np.ndarray,
+):
+    """
+    Fit PCA on training data only and transform both sets.
+
+    Coordinates are normalised with one shared scale so the 2D geometry is not
+    stretched independently along the two axes.
+    """
+    pca = PCA(n_components=2, random_state=42)
+    projected_train = pca.fit_transform(X_train)
+    projected_test = pca.transform(X_test)
+
+    combined = np.vstack([projected_train, projected_test])
+    minimums = combined.min(axis=0)
+    maximums = combined.max(axis=0)
+    centre = (minimums + maximums) / 2
+    shared_span = float(np.max(maximums - minimums))
+    if shared_span == 0:
+        shared_span = 1.0
+
+    # Leave a 5% margin around the plot.
+    normalised_train = 0.5 + ((projected_train - centre) / shared_span) * 0.9
+    normalised_test = 0.5 + ((projected_test - centre) / shared_span) * 0.9
+
+    return normalised_train, normalised_test, pca.explained_variance_ratio_
+
+
+def choose_visualisation_test_cases(
+    y_test: np.ndarray,
+    y_pred: np.ndarray,
+    maximum_cases: int = 8,
+) -> list[int]:
+    """Choose deterministic cases with class coverage, then include mistakes."""
+    selected: list[int] = []
+
+    # First try to show at least one genuine test sample from every class.
+    for class_index in np.unique(y_test):
+        candidates = np.flatnonzero(y_test == class_index)
+        if len(candidates):
+            selected.append(int(candidates[0]))
+        if len(selected) == maximum_cases:
+            return selected
+
+    # Add misclassified cases so the visual does not pretend the model is perfect.
+    for index in np.flatnonzero(y_pred != y_test):
+        index = int(index)
+        if index not in selected:
+            selected.append(index)
+        if len(selected) == maximum_cases:
+            return selected
+
+    # Fill remaining slots with deterministic held-out samples.
+    for index in range(len(y_test)):
+        if index not in selected:
+            selected.append(index)
+        if len(selected) == maximum_cases:
+            break
+
+    return selected
+
+
+def build_knn_visualisation(
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    X_test: np.ndarray,
+    y_test: np.ndarray,
+    y_pred: np.ndarray,
+    train_ids: np.ndarray,
+    test_ids: np.ndarray,
+    class_names: np.ndarray,
+    model: KNeighborsClassifier,
+):
+    """Create an honest frontend payload from the fitted model and real data."""
+    projected_train, projected_test, explained_variance = project_to_two_dimensions(
+        X_train,
+        X_test,
+    )
+
+    selected_test_indices = choose_visualisation_test_cases(y_test, y_pred)
+    selected_X_test = X_test[selected_test_indices]
+    neighbour_distances, neighbour_indices = model.kneighbors(
+        selected_X_test,
+        return_distance=True,
+    )
+
+    training_points = [
+        {
+            "id": int(train_ids[index]),
+            "x": round(float(projected_train[index, 0]), 6),
+            "y": round(float(projected_train[index, 1]), 6),
+            "class_index": int(y_train[index]),
+            "class_name": str(class_names[y_train[index]]),
+        }
+        for index in range(len(X_train))
+    ]
+
+    test_cases = []
+    for visual_index, test_position in enumerate(selected_test_indices):
+        nearest_positions = neighbour_indices[visual_index]
+        distances = neighbour_distances[visual_index]
+        neighbour_labels = y_train[nearest_positions]
+        vote_counts = np.bincount(
+            neighbour_labels,
+            minlength=len(class_names),
+        )
+
+        neighbours = [
+            {
+                "rank": rank + 1,
+                "training_id": int(train_ids[training_position]),
+                "class_index": int(y_train[training_position]),
+                "class_name": str(class_names[y_train[training_position]]),
+                # This is the real distance used by KNN in full scaled space.
+                "distance": round(float(distance), 6),
+            }
+            for rank, (training_position, distance) in enumerate(
+                zip(nearest_positions, distances)
+            )
+        ]
+
+        true_class_index = int(y_test[test_position])
+        predicted_class_index = int(y_pred[test_position])
+        test_cases.append(
+            {
+                "id": int(test_ids[test_position]),
+                "x": round(float(projected_test[test_position, 0]), 6),
+                "y": round(float(projected_test[test_position, 1]), 6),
+                "true_class_index": true_class_index,
+                "true_class_name": str(class_names[true_class_index]),
+                "predicted_class_index": predicted_class_index,
+                "predicted_class_name": str(class_names[predicted_class_index]),
+                "correct": bool(predicted_class_index == true_class_index),
+                "vote_counts": vote_counts.astype(int).tolist(),
+                "neighbours": neighbours,
+            }
+        )
+
+    return {
+        "projection": {
+            "method": "PCA",
+            "components": 2,
+            "explained_variance_ratio": [
+                round(float(value), 6) for value in explained_variance
+            ],
+            "explained_variance_total": round(float(np.sum(explained_variance)), 6),
+            "coordinate_range": [0.05, 0.95],
+            "note": (
+                "PCA coordinates are for display only. Neighbours and distances "
+                "were calculated in the complete standardized feature space."
+            ),
+        },
+        "training_points": training_points,
+        "test_cases": test_cases,
+        "neighbour_count": int(model.n_neighbors),
+        "training_points_sampled": False,
+        "test_case_selection": (
+            "One held-out sample per class where possible, followed by genuine "
+            "misclassifications and then deterministic held-out samples."
+        ),
+    }
+
 
 def serialise_report(report: dict) -> dict:
     serialised: dict = {}
-
     for label, values in report.items():
         if isinstance(values, dict):
             serialised[label] = {
@@ -181,41 +371,55 @@ def serialise_report(report: dict) -> dict:
             serialised[label] = round(float(values), 4)
     return serialised
 
-@app.get('/api/health')
+
+@app.get("/api/health")
 def health_check():
     return {"status": "ok"}
 
-@app.get('/api/datasets')
+
+@app.get("/api/datasets")
 def list_datasets():
     datasets = []
-
     for dataset_name in DATASET_LOADERS:
         X, y, class_names = get_data(dataset_name)
         datasets.append(
             {
-                'name': dataset_name,
-                'display_name': dataset_name.replace("_", " ").title(),
-                'samples': int(X.shape[0]),
-                'features': int(X.shape[1]),
-                'classes': class_names.tolist(),
-                'class_distribution': get_class_distribution(y, class_names),
+                "name": dataset_name,
+                "display_name": dataset_name.replace("_", " ").title(),
+                "samples": int(X.shape[0]),
+                "features": int(X.shape[1]),
+                "classes": class_names.tolist(),
+                "class_distribution": get_class_distribution(y, class_names),
             }
         )
+    return {"datasets": datasets}
 
-    return {'datasets': datasets}
 
-@app.post('/api/analyse')
+@app.post("/api/analyse")
 def analyse_model(request: AnalysisRequest):
     try:
         X, y, class_names = get_data(request.dataset)
-        X_train, y_train, X_test, y_test = scale_data(X, y, request.train_ratio)
+        (
+            X_train,
+            y_train,
+            X_test,
+            y_test,
+            train_ids,
+            test_ids,
+        ) = split_and_scale_data(X, y, request.train_ratio)
 
-        k_values, cv_accs, test_accs = evaluate_k_values(X_train, y_train, X_test, y_test, request.max_k)
+        k_values, cv_accuracies, test_accuracies = evaluate_k_values(
+            X_train,
+            y_train,
+            X_test,
+            y_test,
+            request.max_k,
+        )
 
-        best_cv_idx = int(np.argmax(cv_accs))
-        opt_k = int(k_values[best_cv_idx])
+        best_cv_index = int(np.argmax(cv_accuracies))
+        optimal_k = int(k_values[best_cv_index])
 
-        model = KNeighborsClassifier(n_neighbors=opt_k)
+        model = KNeighborsClassifier(n_neighbors=optimal_k)
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
 
@@ -230,49 +434,60 @@ def analyse_model(request: AnalysisRequest):
 
         chart_points = [
             {
-                'k': int(k),
-                'cv_accuracy': float(cv_accuracy),
-                'test_accuracy': float(test_accuracy),
+                "k": int(k),
+                "cv_accuracy": float(cv_accuracy),
+                "test_accuracy": float(test_accuracy),
             }
             for k, cv_accuracy, test_accuracy in zip(
                 k_values,
-                cv_accs,
-                test_accs,
+                cv_accuracies,
+                test_accuracies,
             )
         ]
 
+        visualisation = build_knn_visualisation(
+            X_train=X_train,
+            y_train=y_train,
+            X_test=X_test,
+            y_test=y_test,
+            y_pred=y_pred,
+            train_ids=train_ids,
+            test_ids=test_ids,
+            class_names=class_names,
+            model=model,
+        )
+
         return {
-            'dataset': {
-                'name': request.dataset,
-                'display_name': request.dataset.replace("_", " ").title(),
-                'samples': int(X.shape[0]),
-                'features': int(X.shape[1]),
-                'classes': class_names.tolist(),
-                'class_distribution': get_class_distribution(y, class_names),
+            "dataset": {
+                "name": request.dataset,
+                "display_name": request.dataset.replace("_", " ").title(),
+                "samples": int(X.shape[0]),
+                "features": int(X.shape[1]),
+                "classes": class_names.tolist(),
+                "class_distribution": get_class_distribution(y, class_names),
             },
-            'split': {
-                'train_ratio': request.train_ratio,
-                'test_ratio': round(1 - request.train_ratio, 4),
-                'training_samples': int(X_train.shape[0]),
-                'test_samples': int(X_test.shape[0]),
+            "split": {
+                "train_ratio": request.train_ratio,
+                "test_ratio": round(1 - request.train_ratio, 4),
+                "training_samples": int(X_train.shape[0]),
+                "test_samples": int(X_test.shape[0]),
             },
-            'optimal_model': {
-                'k': opt_k,
-                'mean_cv_accuracy': float(cv_accs[best_cv_idx]),
-                'test_accuracy': float(test_accs[best_cv_idx]),
+            "optimal_model": {
+                "k": optimal_k,
+                "mean_cv_accuracy": float(cv_accuracies[best_cv_index]),
+                "test_accuracy": float(test_accuracies[best_cv_index]),
             },
-            'k_results': chart_points,
-            'confusion_matrix': matrix.astype(int).tolist(),
-            'classification_report': serialise_report(report),
+            "k_results": chart_points,
+            "confusion_matrix": matrix.astype(int).tolist(),
+            "classification_report": serialise_report(report),
+            "visualisation": visualisation,
         }
-    
+
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     except Exception as error:
         traceback.print_exc()
-
         raise HTTPException(
             status_code=500,
             detail=f"Model analysis failed: {type(error).__name__}: {error}",
         ) from error
-    

@@ -1,6 +1,20 @@
 export type DatasetName = 'iris' | 'digits' | 'wine' | 'breast_cancer'
 
-export interface ClassDistributionEntry {
+export type Stage =
+  | 'select'
+  | 'loading'
+  | 'configure'
+  | 'split'
+  | 'search'
+  | 'fit'
+  | 'results'
+
+export interface RunConfig {
+  train_ratio: number
+  max_k: number
+}
+
+export interface ClassDistributionItem {
   class_index: number
   class_name: string
   samples: number
@@ -12,22 +26,11 @@ export interface DatasetSummary {
   samples: number
   features: number
   classes: string[]
-  class_distribution: ClassDistributionEntry[]
+  class_distribution: ClassDistributionItem[]
 }
 
 export interface DatasetsResponse {
   datasets: DatasetSummary[]
-}
-
-export interface AnalysisConfig {
-  dataset: DatasetName
-  train_ratio: number
-  max_k: number
-}
-
-export interface RunConfig {
-  train_ratio: number
-  max_k: number
 }
 
 export interface SplitInfo {
@@ -37,15 +40,15 @@ export interface SplitInfo {
   test_samples: number
 }
 
-export interface OptimalModel {
-  k: number
-  mean_cv_accuracy: number
-  test_accuracy: number
-}
-
 export interface KResultPoint {
   k: number
   cv_accuracy: number
+  test_accuracy: number
+}
+
+export interface OptimalModel {
+  k: number
+  mean_cv_accuracy: number
   test_accuracy: number
 }
 
@@ -56,7 +59,57 @@ export interface ClassificationReportRow {
   support: number
 }
 
-export type ClassificationReport = Record<string, ClassificationReportRow | number>
+export type ClassificationReport = Record<
+  string,
+  ClassificationReportRow | number
+>
+
+export interface ProjectionInfo {
+  method: 'PCA'
+  components: 2
+  explained_variance_ratio: number[]
+  explained_variance_total: number
+  coordinate_range: [number, number]
+  note: string
+}
+
+export interface VisualisationTrainingPoint {
+  id: number
+  x: number
+  y: number
+  class_index: number
+  class_name: string
+}
+
+export interface VisualisationNeighbour {
+  rank: number
+  training_id: number
+  class_index: number
+  class_name: string
+  distance: number
+}
+
+export interface VisualisationTestCase {
+  id: number
+  x: number
+  y: number
+  true_class_index: number
+  true_class_name: string
+  predicted_class_index: number
+  predicted_class_name: string
+  correct: boolean
+  vote_counts: number[]
+  neighbours: VisualisationNeighbour[]
+}
+
+export interface KNNVisualisation {
+  projection: ProjectionInfo
+  training_points: VisualisationTrainingPoint[]
+  test_cases: VisualisationTestCase[]
+  neighbour_count: number
+  training_points_sampled: boolean
+  test_case_selection: string
+}
 
 export interface AnalysisResponse {
   dataset: DatasetSummary
@@ -65,13 +118,5 @@ export interface AnalysisResponse {
   k_results: KResultPoint[]
   confusion_matrix: number[][]
   classification_report: ClassificationReport
+  visualisation: KNNVisualisation
 }
-
-export type Stage =
-  | 'select'
-  | 'loading'
-  | 'configure'
-  | 'split'
-  | 'search'
-  | 'fit'
-  | 'results'

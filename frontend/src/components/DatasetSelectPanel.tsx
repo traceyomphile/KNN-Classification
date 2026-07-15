@@ -81,7 +81,7 @@ export default function DatasetSelectPanel({ dataset, onSelect, connectionError 
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="font-display text-lg text-paper capitalize">{d.display_name}</span>
+                <span className="font-display text-lg text-paper uppercase">{d.display_name}</span>
                 {active && <span className="w-2 h-2 rounded-full bg-cyan" />}
               </div>
               <p className="text-sm text-mist mt-1 leading-snug">{DATASET_BLURB[d.name]}</p>

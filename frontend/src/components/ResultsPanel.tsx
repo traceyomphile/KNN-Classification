@@ -34,7 +34,7 @@ export default function ResultsPanel({ result, onRestart, onBack }: ResultsPanel
         <Award size={18} />
         <span className="font-mono text-xs uppercase tracking-[0.25em]">Results</span>
       </div>
-      <h3 className="font-display text-3xl text-paper text-center mb-8 capitalize">
+      <h3 className="font-display text-3xl text-paper text-center mb-8 uppercase">
         {dataset.display_name} · K={optimal_model.k}
       </h3>
 
