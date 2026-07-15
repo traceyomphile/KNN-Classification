@@ -78,7 +78,7 @@ export default function App() {
 
       {!showSplash && (
         <>
-          <StepHeader stage={stage} />
+          <StepHeader stage={stage} onHome={handleRestart} />
           <main className="px-6 py-14 min-h-[80vh] flex items-center justify-center">
             <AnimatePresence mode="wait">
               {stage === 'select' && (

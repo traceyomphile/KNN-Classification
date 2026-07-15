@@ -30,14 +30,60 @@ const PLACEHOLDER_DATASETS: Pick<DatasetSummary, 'name' | 'display_name' | 'samp
 export default function DatasetSelectPanel({ dataset, onSelect, connectionError }: DatasetSelectPanelProps) {
   const [datasets, setDatasets] = useState<DatasetSummary[] | null>(null)
   const [loadErr, setLoadErr] = useState<string | null>(null)
+  const [retrySeconds, setRetrySeconds] = useState(30)
 
   useEffect(() => {
-    fetchDatasets()
-      .then((d) => setDatasets(d.datasets))
-      .catch((e: Error) => setLoadErr(e.message))
+    let cancelled = false
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
+    const startedAt = Date.now()
+    const retryWindowMs = 30_000
+    let countdownTimer: ReturnType<typeof setInterval> | undefined = undefined
+
+    countdownTimer = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((retryWindowMs - (Date.now() - startedAt)) / 1_000))
+      setRetrySeconds(remaining)
+    }, 1_000)
+
+    const tryFetchDatasets = async () => {
+      try {
+        const response = await fetchDatasets()
+        if (cancelled) return
+
+        setDatasets(response.datasets)
+        setLoadErr(null)
+        setRetrySeconds(0)
+        if (countdownTimer) clearInterval(countdownTimer)
+      } catch (error) {
+        if (cancelled) return
+
+        const elapsed = Date.now() - startedAt
+        if (elapsed < retryWindowMs) {
+          retryTimer = setTimeout(tryFetchDatasets, 3_000)
+          return
+        }
+
+        setLoadErr(error instanceof Error ? error.message : 'Unknown connection error')
+        setRetrySeconds(0)
+        if (countdownTimer) clearInterval(countdownTimer)
+      }
+    }
+
+    countdownTimer = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((retryWindowMs - (Date.now() - startedAt)) / 1_000))
+      setRetrySeconds(remaining)
+    }, 1_000)
+
+    tryFetchDatasets()
+
+    return () => {
+      cancelled = true
+      if (retryTimer) clearTimeout(retryTimer)
+      if (countdownTimer) clearInterval(countdownTimer)
+    }
   }, [])
 
   const cards = datasets ?? PLACEHOLDER_DATASETS
+  const cardsDisabled = !datasets || !!loadErr
 
   return (
     <motion.div
@@ -46,14 +92,23 @@ export default function DatasetSelectPanel({ dataset, onSelect, connectionError 
       transition={{ duration: 0.45 }}
       className="w-full max-w-4xl mx-auto"
     >
-      <div className="flex flex-col items-center justify-canter gap-2 mb-6 text-center">
+      <div className="flex flex-col items-center justify-center gap-2 mb-6 text-center">
         <Database size={28} className="text-cyan" />
         <span className="font-mono text-base font-bold uppercase tracking-[0.25em] text-fog">01 · Select dataset</span>
       </div>
 
+      {!datasets && !loadErr && (
+        <div className="mb-6 rounded-lg border border-line bg-panel px-4 py-3 text-center">
+          <p className="text-sm text-mist">Connecting to the model server…</p>
+          <p className="font-mono text-xs text-fog mt-1">
+            Retrying for {retrySeconds} more second{retrySeconds === 1 ? '' : 's'}
+          </p>
+        </div>
+      )}
+
       {loadErr && (
         <div className="mb-6 flex items-start gap-3 rounded-lg border border-coral/40 bg-coral/10 px-4 py-3 text-sm text-coral">
-          <AlertTriangle size={20} className="mt-0.5 shrink-0" />
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
           <div>
             <p className="font-medium">Can't reach the model server.</p>
             <p className="text-coral/80 mt-0.5">{loadErr} — start the FastAPI backend and confirm VITE_API_URL, then refresh.</p>
@@ -68,13 +123,13 @@ export default function DatasetSelectPanel({ dataset, onSelect, connectionError 
             <motion.button
               key={d.name}
               onClick={() => onSelect(d.name)}
-              disabled={!!loadErr}
-              whileHover={loadErr ? undefined : {
+              disabled={cardsDisabled}
+              whileHover={cardsDisabled ? undefined : {
                 y: -7,
                 scale: 1.025,
                 boxShadow: '0 18px 38px rgba(0, 0, 0, 0.38)',
               }}
-              whileTap={loadErr ? undefined : { scale: 0.985 }}
+              whileTap={cardsDisabled ? undefined : { scale: 0.985 }}
               transition={{ type: 'spring', stiffness: 360, damping: 22 }}
               className={`text-left rounded-xl border px-5 py-4 disabled:opacity-40 disabled:cursor-not-allowed ${
                 active ? 'border-cyan bg-cyan/[0.07]' : 'border-line bg-panel hover:border-cyan'

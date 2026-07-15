@@ -14,6 +14,10 @@ export interface RunConfig {
   max_k: number
 }
 
+export interface AnalysisConfig extends RunConfig {
+  dataset: DatasetName
+}
+
 export interface ClassDistributionItem {
   class_index: number
   class_name: string

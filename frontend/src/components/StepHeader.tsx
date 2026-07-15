@@ -5,17 +5,23 @@ const STEPS: Stage[] = ['select', 'loading', 'configure', 'search', 'fit', 'resu
 
 interface StepHeaderProps {
   stage: Stage
+  onHome: () => void
 }
 
-export default function StepHeader({ stage }: StepHeaderProps) {
+export default function StepHeader({ stage, onHome }: StepHeaderProps) {
   const idx = STEPS.indexOf(stage)
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-ink/80 backdrop-blur">
       <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onHome}
+          aria-label="Return to dataset selection"
+          className="flex items-center gap-2 cursor-pointer bg-transparent border-0 p-0"
+        >
           <Radar size={18} className="text-cyan" />
           <span className="font-display text-lg text-paper tracking-tight">KNN <span className="text-cyan">Classifier</span></span>
-        </div>
+        </button>
         <div className="hidden md:flex items-center gap-1.5">
           {STEPS.map((s, i) => (
             <div key={s} className="flex items-center gap-1.5">
