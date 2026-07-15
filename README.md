@@ -1,13 +1,13 @@
 # KNN Classification Visualizer
 
-A full-stack machine learning visualization project built as the second project in the DecodeLabs Internship. The application lets users explore how the K-Nearest Neighbours (KNN) algorithm behaves on standard classification datasets, compare candidate K values through cross-validation, and inspect the resulting model through charts, confusion matrices, and neighbour-level visualizations.
+KNN Classification Visualizer is a full-stack machine learning project that helps users explore how the K-Nearest Neighbours (KNN) algorithm behaves on classification data. The app supports both built-in scikit-learn datasets and user-uploaded CSV/TSV files, making it easy to compare how different K values perform and inspect the resulting model through charts, confusion matrices, and neighbour-level explanations.
 
-This project combines:
+This repository combines:
 
-- A FastAPI backend for loading datasets, training and evaluating the KNN model, and returning structured analysis results.
-- A React + TypeScript + Vite frontend for a guided, step-by-step visual workflow.
-- A Python virtual environment for backend dependency isolation.
-- A Node.js dependency setup for frontend tooling and local development.
+- a FastAPI backend for dataset loading, preprocessing, model evaluation, and structured result delivery
+- a React + TypeScript + Vite frontend for a guided, step-by-step visual workflow
+- a Python virtual environment for backend dependency isolation
+- a Node.js setup for frontend development and local build tooling
 
 ---
 
@@ -17,11 +17,15 @@ The app is designed to help users understand KNN classification in an interactiv
 
 ### What the project does
 
-- Lets the user choose from several built-in scikit-learn datasets:
-  - iris
-  - digits
-  - wine
-  - breast_cancer
+- Lets the user choose between two dataset sources:
+  - Standard built-in scikit-learn datasets:
+    - iris
+    - digits
+    - wine
+    - breast_cancer
+  - An uploaded dataset from the user’s own machine
+- Accepts uploaded data in CSV or TSV format only.
+- Uses the last column as the target/class label and all earlier columns as numeric feature inputs.
 - Splits each dataset into training and testing subsets.
 - Standardizes the features using StandardScaler after splitting to avoid information leakage.
 - Evaluates candidate odd K values across a cross-validation search.
@@ -37,11 +41,11 @@ The app is designed to help users understand KNN classification in an interactiv
 
 This project is useful for learning and demonstrating:
 
-- the effect of K on model performance
-- how train/test splitting works
-- how feature scaling impacts distance-based algorithms
-- how cross-validation helps estimate model quality
-- how a production-style frontend can integrate with a Python ML backend
+- how K affects model performance
+- how train/test splitting works in practice
+- how feature scaling influences distance-based algorithms
+- how cross-validation helps estimate generalisation quality
+- how a production-style frontend can connect to a Python ML backend
 
 ---
 
@@ -109,10 +113,11 @@ The application follows a simple client-server architecture.
 
 The frontend:
 
-- displays a dataset selection view
+- displays a source-selection screen with two options: standard datasets or uploaded data
+- lets the user browse the built-in scikit-learn dataset list or choose a local CSV/TSV file
 - shows a loading phase with animated progress
 - allows configuration of train ratio and maximum K
-- triggers the analysis request
+- triggers the appropriate analysis request for either standard or uploaded datasets
 - renders the K-search chart, fit/predict view, and final results panel
 - displays confusion matrix, classification details, and PCA-based visualizations
 
@@ -120,8 +125,9 @@ The frontend:
 
 The backend:
 
-- loads datasets from scikit-learn
-- returns metadata about available datasets and their class distribution
+- loads built-in datasets from scikit-learn
+- validates and parses uploaded CSV/TSV files
+- returns metadata about available standard datasets and their class distribution
 - splits the selected dataset into train and test sets
 - scales the features using StandardScaler
 - performs K-fold cross-validation for odd K values
@@ -130,9 +136,9 @@ The backend:
 
 ### Data flow
 
-1. The user selects a dataset in the frontend.
-2. The frontend sends a POST request to the backend analysis endpoint.
-3. The backend loads the dataset, performs preprocessing and model evaluation.
+1. The user chooses either a standard dataset or an uploaded dataset in the frontend.
+2. The frontend sends a POST request to either the standard analysis endpoint or the uploaded-data analysis endpoint.
+3. The backend loads or parses the dataset, performs preprocessing and model evaluation.
 4. The backend returns metrics and visualization payloads.
 5. The frontend renders the results step by step.
 
@@ -149,6 +155,7 @@ These are defined in [backend/requirements.txt](backend/requirements.txt):
 - pydantic
 - numpy
 - scikit-learn
+- python-multipart
 
 #### Purpose of each
 
@@ -157,6 +164,7 @@ These are defined in [backend/requirements.txt](backend/requirements.txt):
 - pydantic: schema validation and request model definitions.
 - numpy: numerical data operations needed by the KNN workflow.
 - scikit-learn: dataset loading, scaling, PCA, classifier logic, and metrics.
+- python-multipart: enables FastAPI file upload handling for the CSV/TSV analysis route.
 
 ### Frontend dependencies
 
@@ -383,7 +391,7 @@ Returns a list of all supported datasets, including dataset metadata, sample cou
 
 ### POST /api/analyse
 
-Runs the full KNN analysis pipeline.
+Runs the full KNN analysis pipeline for a built-in standard dataset.
 
 #### Request body
 
@@ -398,6 +406,29 @@ Runs the full KNN analysis pipeline.
 #### Fields
 
 - dataset: one of iris, digits, wine, or breast_cancer
+- train_ratio: train/test split ratio, must be between 0.5 and 0.95
+- max_k: maximum candidate K value to evaluate, between 3 and 99
+
+### POST /api/analyse-upload
+
+Runs the full KNN analysis pipeline for a user-uploaded dataset.
+
+#### Upload requirements
+
+- file type must be CSV or TSV
+- file size must be 10 MB or smaller
+- file must use UTF-8 text encoding
+- the first row must contain column names
+- the last column is treated as the target/class label
+- all preceding columns must be numeric feature values
+- the dataset must contain at least two numeric feature columns and one target column
+- the target column must contain at least two classes
+- every class must have at least three samples so the stratified split remains valid
+- uploaded datasets are limited to 10,000 data rows
+
+#### Form fields
+
+- file: uploaded CSV/TSV file
 - train_ratio: train/test split ratio, must be between 0.5 and 0.95
 - max_k: maximum candidate K value to evaluate, between 3 and 99
 
@@ -419,12 +450,15 @@ The frontend is structured as a guided multi-step experience.
 
 ### Step flow
 
-1. Dataset selection
-2. Loading animation
-3. Configuration panel
-4. K-search visualization
-5. Fit and prediction visualization
-6. Results panel
+1. Choose data source
+   - Standard datasets
+   - Upload your own CSV or TSV file
+2. If using a standard dataset, choose one of the built-in dataset cards
+3. Loading animation
+4. Configuration panel
+5. K-search visualization
+6. Fit and prediction visualization
+7. Results panel
 
 This step-by-step flow is implemented in [frontend/src/App.tsx](frontend/src/App.tsx) and the supporting components under [frontend/src/components](frontend/src/components).
 
@@ -577,13 +611,13 @@ Ensure:
 
 ## 18. Development Summary
 
-This repository is a strong demonstration of:
+This repository demonstrates:
 
 - Python backend engineering with FastAPI
-- front-end integration with React + TypeScript
-- interactive visualization of machine learning behaviour
-- dependency isolation using a backend virtual environment
-- practical full-stack development for a ML-focused internship project
+- frontend integration with React + TypeScript
+- interactive machine learning visualization
+- backend dependency isolation using a virtual environment
+- practical full-stack development for an ML-focused internship project
 
 ---
 
@@ -605,7 +639,7 @@ Then open:
 
 ## 20. Conclusion
 
-The KNN Classification Visualizer is a practical, educational, and visually rich machine learning project that combines backend intelligence with frontend usability. It is especially appropriate as the second project in the DecodeLabs Internship because it demonstrates core skills in:
+KNN Classification Visualizer is a practical, educational, and visually rich machine learning project that combines backend intelligence with frontend usability. It is especially well suited to portfolio, internship, and demonstration use because it highlights:
 
 - data science workflow design
 - API development
@@ -613,4 +647,4 @@ The KNN Classification Visualizer is a practical, educational, and visually rich
 - machine learning evaluation
 - environment and dependency management
 
-If you are using this project for portfolio, internship, or demonstration purposes, this README gives a complete reference point for setup, architecture, running instructions, dependencies, and overall project understanding.
+This README provides the setup, architecture, running instructions, dependency notes, and overall project context needed to work with the repository effectively.

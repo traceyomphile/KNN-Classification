@@ -1,75 +1,84 @@
-# React + TypeScript + Vite
+# KNN Classification Visualizer Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This frontend is the interactive React + TypeScript interface for the KNN Classification Visualizer.
 
-Currently, two official plugins are available:
+It guides the user through a visual workflow for exploring how the K-Nearest Neighbours algorithm behaves on either:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- built-in standard scikit-learn datasets, or
+- a user-uploaded CSV/TSV dataset.
 
-## React Compiler
+## What the UI does
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The frontend currently supports the following flow:
 
-## Expanding the ESLint configuration
+1. Choose a data source
+   - Standard datasets
+   - Upload a CSV or TSV file
+2. Select a built-in dataset, if applicable
+3. Review the loading state
+4. Configure the train/test split ratio and maximum K
+5. View the K-search visualization
+6. Review the fit/predict visualization
+7. Inspect the final results and confusion matrix
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Dataset upload rules
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+When a user uploads their own dataset:
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- only `.csv` and `.tsv` files are accepted
+- the file must include a header row
+- the last column is treated as the class/target label
+- all earlier columns must be numeric features
+- the uploaded file must be 10 MB or smaller
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Frontend stack
 
+- React 19
+- TypeScript
+- Vite 8
+- Tailwind CSS 4
+- Framer Motion
+- Recharts
+- Lucide React
+
+## Local development
+
+From the project root:
+
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The dev server runs at:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- http://localhost:5173
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Production build
 
+```bash
+cd frontend
+npm run build
 ```
+
+## Linting
+
+```bash
+cd frontend
+npm run lint
+```
+
+## Environment variable
+
+The frontend reads the backend API base URL from:
+
+- `VITE_API_URL`
+
+If it is not set, it defaults to:
+
+- http://localhost:8000
+
+## Notes
+
+This frontend is meant to be used with the FastAPI backend in the root project. The backend provides the dataset list, performs KNN evaluation, and returns the structured visual payload that powers the charts and result panels.
