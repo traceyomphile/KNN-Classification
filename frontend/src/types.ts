@@ -1,6 +1,7 @@
 export type DatasetName = 'iris' | 'digits' | 'wine' | 'breast_cancer'
 
 export type Stage =
+  | 'source'
   | 'select'
   | 'loading'
   | 'configure'

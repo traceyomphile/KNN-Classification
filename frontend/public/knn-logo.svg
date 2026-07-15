@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title description">
+  <title id="title">KNN Classifier</title>
+  <desc id="description">A central query point connected to its nearest neighbours.</desc>
+
+  <rect width="64" height="64" rx="14" fill="#071321"/>
+  <circle cx="32" cy="32" r="25" fill="#0D223B" stroke="#26364D" stroke-width="1.5"/>
+
+  <g stroke="#2C8C7E" stroke-width="2" stroke-linecap="round" opacity="0.9">
+    <path d="M32 32 32 12"/>
+    <path d="M32 32 49 21"/>
+    <path d="M32 32 51 42"/>
+    <path d="M32 32 32 53"/>
+    <path d="M32 32 14 43"/>
+    <path d="M32 32 14 21"/>
+  </g>
+
+  <g fill="#5EEAD4" stroke="#071321" stroke-width="2">
+    <circle cx="32" cy="12" r="4.5"/>
+    <circle cx="49" cy="21" r="4.5"/>
+    <circle cx="51" cy="42" r="4.5"/>
+    <circle cx="32" cy="53" r="4.5"/>
+    <circle cx="14" cy="43" r="4.5"/>
+    <circle cx="14" cy="21" r="4.5"/>
+  </g>
+
+  <circle cx="32" cy="32" r="8" fill="#FF6B4A" opacity="0.22"/>
+  <circle cx="32" cy="32" r="5.5" fill="#FF6B4A" stroke="#FFFFFF" stroke-width="1.5"/>
+</svg>

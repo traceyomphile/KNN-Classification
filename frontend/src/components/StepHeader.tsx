@@ -1,7 +1,7 @@
 import { Radar } from 'lucide-react'
 import type { Stage } from '../types'
 
-const STEPS: Stage[] = ['select', 'loading', 'configure', 'search', 'fit', 'results']
+const STEPS: Stage[] = ['source', 'select', 'loading', 'configure', 'search', 'fit', 'results']
 
 interface StepHeaderProps {
   stage: Stage
@@ -16,7 +16,8 @@ export default function StepHeader({ stage, onHome }: StepHeaderProps) {
         <button
           type="button"
           onClick={onHome}
-          aria-label="Return to dataset selection"
+          aria-label="Return to Data Source"
+          title="Return to Data Source"
           className="flex items-center gap-2 cursor-pointer bg-transparent border-0 p-0"
         >
           <Radar size={18} className="text-cyan" />

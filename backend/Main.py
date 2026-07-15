@@ -1,9 +1,12 @@
+import csv
+import io
 from math import ceil
+from pathlib import Path
 from typing import Literal
 import traceback
 
 import numpy as np
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sklearn.datasets import (
@@ -23,7 +26,7 @@ from sklearn.model_selection import (
     train_test_split,
 )
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 
 DatasetName = Literal["iris", "digits", "wine", "breast_cancer"]
@@ -358,6 +361,184 @@ def build_knn_visualisation(
         ),
     }
 
+async def read_uploaded_dataset(file: UploadFile):
+    filename = file.filename or "uploaded_dataset"
+    extension = Path(filename).suffix.lower()
+    if extension not in {".csv", ".tsv"}:
+        raise ValueError("Only CSV and TSV files are allowed.")
+
+    maximum_file_size = 10 * 1024 * 1024        # max size = 10 MB
+    content = await file.read(maximum_file_size + 1)
+    if len(content) > maximum_file_size:
+        raise ValueError("The uploaded file must be 10 MB or smaller.")
+
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError as error:
+        raise ValueError("The uploaded file must use UTF-8 text encoding.") from error
+
+    delimiter = "\t" if extension == ".tsv" else ","
+    rows = list(csv.reader(io.StringIO(text), delimiter=delimiter))
+    rows = [row for row in rows if any(value.strip() for value in row)]
+
+    if len(rows) < 3:
+        raise ValueError(
+            "The file needs a header row and at least two data rows."
+        )
+
+    header = [value.strip() for value in rows[0]]
+    if len(header) < 3:
+        raise ValueError(
+            "The file needs at least two numeric feature columns and one target column."
+        )
+    if any(not name for name in header):
+        raise ValueError("Every column must have a name in the header row.")
+
+    data_rows = rows[1:]
+    if len(data_rows) > 10_000:
+        raise ValueError("Uploaded datasets are limited to 10,000 data rows.")
+
+    feature_rows: list[list[float]] = []
+    target_values: list[str] = []
+    expected_columns = len(header)
+
+    for row_number, row in enumerate(data_rows, start=2):
+        if len(row) != expected_columns:
+            raise ValueError(
+                f"Row {row_number} has {len(row)} columns; expected {expected_columns}."
+            )
+
+        cleaned = [value.strip() for value in row]
+        if any(value == "" for value in cleaned):
+            raise ValueError(f"Row {row_number} contains a missing value.")
+
+        try:
+            features = [float(value) for value in cleaned[:-1]]
+        except ValueError as error:
+            raise ValueError(
+                f"Row {row_number} contains a non-numeric feature value. "
+                "Only the final target column may contain text."
+            ) from error
+
+        feature_rows.append(features)
+        target_values.append(cleaned[-1])
+
+    X = np.asarray(feature_rows, dtype=np.float64)
+    if not np.isfinite(X).all():
+        raise ValueError("Feature values must be finite numbers.")
+
+    label_encoder = LabelEncoder()
+    y = label_encoder.fit_transform(target_values)
+    class_names = label_encoder.classes_.astype(str)
+
+    if len(class_names) < 2:
+        raise ValueError("The target column must contain at least two classes.")
+
+    class_counts = np.bincount(y, minlength=len(class_names))
+    if int(np.min(class_counts)) < 3:
+        raise ValueError(
+            "Every class needs at least three samples for a stratified train/test split."
+        )
+
+    return X, y, class_names, Path(filename).stem
+
+def build_analysis_response(
+    X: np.ndarray,
+    y: np.ndarray,
+    class_names: np.ndarray,
+    dataset_name: str,
+    display_name: str,
+    train_ratio: float,
+    max_k: int,
+):
+    (
+        X_train,
+        y_train,
+        X_test,
+        y_test,
+        train_ids,
+        test_ids,
+    ) = split_and_scale_data(X, y, train_ratio)
+
+    k_values, cv_accuracies, test_accuracies = evaluate_k_values(
+        X_train,
+        y_train,
+        X_test,
+        y_test,
+        max_k,
+    )
+
+    best_cv_index = int(np.argmax(cv_accuracies))
+    optimal_k = int(k_values[best_cv_index])
+
+    model = KNeighborsClassifier(n_neighbors=optimal_k)
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+
+    report = classification_report(
+        y_test,
+        y_pred,
+        labels=np.arange(len(class_names)),
+        target_names=class_names,
+        output_dict=True,
+        zero_division=0,
+    )
+    matrix = confusion_matrix(
+        y_test,
+        y_pred,
+        labels=np.arange(len(class_names)),
+    )
+
+    chart_points = [
+        {
+            "k": int(k),
+            "cv_accuracy": float(cv_accuracy),
+            "test_accuracy": float(test_accuracy),
+        }
+        for k, cv_accuracy, test_accuracy in zip(
+            k_values,
+            cv_accuracies,
+            test_accuracies,
+        )
+    ]
+
+    visualisation = build_knn_visualisation(
+        X_train=X_train,
+        y_train=y_train,
+        X_test=X_test,
+        y_test=y_test,
+        y_pred=y_pred,
+        train_ids=train_ids,
+        test_ids=test_ids,
+        class_names=class_names,
+        model=model,
+    )
+
+    return {
+        "dataset": {
+            "name": dataset_name,
+            "display_name": display_name,
+            "samples": int(X.shape[0]),
+            "features": int(X.shape[1]),
+            "classes": class_names.tolist(),
+            "class_distribution": get_class_distribution(y, class_names),
+        },
+        "split": {
+            "train_ratio": train_ratio,
+            "test_ratio": round(1 - train_ratio, 4),
+            "training_samples": int(X_train.shape[0]),
+            "test_samples": int(X_test.shape[0]),
+        },
+        "optimal_model": {
+            "k": optimal_k,
+            "mean_cv_accuracy": float(cv_accuracies[best_cv_index]),
+            "test_accuracy": float(test_accuracies[best_cv_index]),
+        },
+        "k_results": chart_points,
+        "confusion_matrix": matrix.astype(int).tolist(),
+        "classification_report": serialise_report(report),
+        "visualisation": visualisation,
+    }
 
 def serialise_report(report: dict) -> dict:
     serialised: dict = {}
@@ -399,89 +580,15 @@ def list_datasets():
 def analyse_model(request: AnalysisRequest):
     try:
         X, y, class_names = get_data(request.dataset)
-        (
-            X_train,
-            y_train,
-            X_test,
-            y_test,
-            train_ids,
-            test_ids,
-        ) = split_and_scale_data(X, y, request.train_ratio)
-
-        k_values, cv_accuracies, test_accuracies = evaluate_k_values(
-            X_train,
-            y_train,
-            X_test,
-            y_test,
-            request.max_k,
-        )
-
-        best_cv_index = int(np.argmax(cv_accuracies))
-        optimal_k = int(k_values[best_cv_index])
-
-        model = KNeighborsClassifier(n_neighbors=optimal_k)
-        model.fit(X_train, y_train)
-        y_pred = model.predict(X_test)
-
-        report = classification_report(
-            y_test,
-            y_pred,
-            target_names=class_names,
-            output_dict=True,
-            zero_division=0,
-        )
-        matrix = confusion_matrix(y_test, y_pred)
-
-        chart_points = [
-            {
-                "k": int(k),
-                "cv_accuracy": float(cv_accuracy),
-                "test_accuracy": float(test_accuracy),
-            }
-            for k, cv_accuracy, test_accuracy in zip(
-                k_values,
-                cv_accuracies,
-                test_accuracies,
-            )
-        ]
-
-        visualisation = build_knn_visualisation(
-            X_train=X_train,
-            y_train=y_train,
-            X_test=X_test,
-            y_test=y_test,
-            y_pred=y_pred,
-            train_ids=train_ids,
-            test_ids=test_ids,
+        return build_analysis_response(
+            X=X,
+            y=y,
             class_names=class_names,
-            model=model,
+            dataset_name=request.dataset,
+            display_name=request.dataset.replace("_", " ").title(),
+            train_ratio=request.train_ratio,
+            max_k=request.max_k
         )
-
-        return {
-            "dataset": {
-                "name": request.dataset,
-                "display_name": request.dataset.replace("_", " ").title(),
-                "samples": int(X.shape[0]),
-                "features": int(X.shape[1]),
-                "classes": class_names.tolist(),
-                "class_distribution": get_class_distribution(y, class_names),
-            },
-            "split": {
-                "train_ratio": request.train_ratio,
-                "test_ratio": round(1 - request.train_ratio, 4),
-                "training_samples": int(X_train.shape[0]),
-                "test_samples": int(X_test.shape[0]),
-            },
-            "optimal_model": {
-                "k": optimal_k,
-                "mean_cv_accuracy": float(cv_accuracies[best_cv_index]),
-                "test_accuracy": float(test_accuracies[best_cv_index]),
-            },
-            "k_results": chart_points,
-            "confusion_matrix": matrix.astype(int).tolist(),
-            "classification_report": serialise_report(report),
-            "visualisation": visualisation,
-        }
 
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
@@ -491,3 +598,31 @@ def analyse_model(request: AnalysisRequest):
             status_code=500,
             detail=f"Model analysis failed: {type(error).__name__}: {error}",
         ) from error
+    
+@app.post("/api/analyse-upload")
+async def analyse_upload_model(
+    file: UploadFile = File(...), 
+    train_ratio: float = Form(0.8, gt=0.5, lt=0.95),
+    max_k: int = Form(25, ge=3, le=99)
+):
+    try:
+        X, y, class_names, display_name = await read_uploaded_dataset(file)
+        return build_analysis_response(
+            X=X,
+            y=y,
+            class_names=class_names,
+            dataset_name="uploaded",
+            display_name=display_name,
+            train_ratio=train_ratio,
+            max_k=max_k,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Uploaded dataset analysis failed: {type(error).__name__}: {error}",
+        ) from error
+    finally:
+        await file.close()

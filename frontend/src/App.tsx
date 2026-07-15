@@ -4,27 +4,44 @@ import { AlertTriangle, ArrowLeft } from 'lucide-react'
 
 import SplashScreen from './components/SplashScreen'
 import StepHeader from './components/StepHeader'
+import DataSourcePanel from './components/DataSourcePanel'
 import DatasetSelectPanel from './components/DatasetSelectPanel'
 import LoadingBar from './components/LoadingBar'
 import ConfigPanel from './components/ConfigPanel'
 import KSearchViz from './components/KSearchViz'
 import KnnFitPredictViz from './components/KNNFitPredictViz'
 import ResultsPanel from './components/ResultsPanel'
-import { runAnalysis } from './api'
+import { runAnalysis, runUploadedAnalysis } from './api'
 import type { AnalysisResponse, DatasetName, RunConfig, Stage } from './types'
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(true)
-  const [stage, setStage] = useState<Stage>('select')
+  const [stage, setStage] = useState<Stage>('source')
   const [dataset, setDataset] = useState<DatasetName>('iris')
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [config, setConfig] = useState<RunConfig>({ train_ratio: 0.8, max_k: 25 })
   const [loadProgress, setLoadProgress] = useState(0)
   const [result, setResult] = useState<AnalysisResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const runId = useRef(0)
 
+  function handleStandardDatasets() {
+    setUploadedFile(null)
+    setResult(null)
+    setError(null)
+    setStage('select')
+  }
+
+  function handleUploadedDataset(file: File) {
+    setUploadedFile(file)
+    setResult(null)
+    setError(null)
+    setStage('configure')
+  }
+  
   function handleDatasetSelect(nextDataset: DatasetName) {
     runId.current += 1
+    setUploadedFile(null)
     setDataset(nextDataset)
     setResult(null)
     setError(null)
@@ -56,7 +73,11 @@ export default function App() {
     setError(null)
     setResult(null)
     setStage('search')
-    runAnalysis({ dataset, train_ratio: config.train_ratio, max_k: config.max_k })
+    const analysis = uploadedFile 
+      ? runUploadedAnalysis(uploadedFile, config)
+      : runAnalysis({ dataset, train_ratio: config.train_ratio, max_k: config.max_k})
+
+    analysis
       .then((res) => {
         if (runId.current === currentRun) setResult(res)
       })
@@ -69,7 +90,8 @@ export default function App() {
     runId.current += 1
     setResult(null)
     setError(null)
-    setStage('select')
+    setUploadedFile(null)
+    setStage('source')
   }
 
   return (
@@ -81,6 +103,14 @@ export default function App() {
           <StepHeader stage={stage} onHome={handleRestart} />
           <main className="px-6 py-14 min-h-[80vh] flex items-center justify-center">
             <AnimatePresence mode="wait">
+              {stage === 'source' && (
+                <motion.div key="source" exit={{ opacity: 0}} className="w-full">
+                  <DataSourcePanel
+                    onStandardDatasets={handleStandardDatasets}
+                    onUploadDataset={handleUploadedDataset}
+                  />
+                </motion.div>
+              )}
               {stage === 'select' && (
                 <motion.div key="select" exit={{ opacity: 0 }} className="w-full">
                   <DatasetSelectPanel dataset={dataset} onSelect={handleDatasetSelect} />
@@ -94,7 +124,7 @@ export default function App() {
                     label={`Loading ${dataset.replace('_', ' ')}`}
                     sublabel="Fetching samples & standard-scaling features"
                   />
-                  <BackButton onClick={handleRestart} label="Back to datasets" />
+                  <BackButton onClick={() => setStage('select')} label="Back to datasets" />
                 </motion.div>
               )}
 
@@ -105,7 +135,14 @@ export default function App() {
                     config={config}
                     setConfig={setConfig}
                     onRun={handleRun}
-                    onBack={handleRestart}
+                    onBack={() => {
+                      if (uploadedFile) {
+                        setUploadedFile(null)
+                        setStage('source')
+                      } else {
+                        setStage('select')
+                      }
+                    }}
                   />
                 </motion.div>
               )}
